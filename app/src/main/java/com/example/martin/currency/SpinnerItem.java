@@ -1,10 +1,12 @@
 package com.example.martin.currency;
 
+import java.io.Serializable;
+
 /**
  * Created by Martin on 2017-11-20.
  */
 
-public class SpinnerItem {
+public class SpinnerItem implements Serializable{
     String text;
     int imageId;
 

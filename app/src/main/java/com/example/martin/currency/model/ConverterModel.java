@@ -25,7 +25,7 @@ public class ConverterModel implements Serializable {
     private ArrayList<Currency> currencies = new ArrayList<>();
     private  static ConverterModel model;
 
-    public static ConverterModel getInstance(){
+    public synchronized static ConverterModel getInstance(){
         if(model == null)
             model = new ConverterModel();
         return model;
@@ -93,8 +93,8 @@ public class ConverterModel implements Serializable {
         this.dateUpdated = dateUpdated;
     }
 
-    public boolean isUpToDate(){
-        return dateUpdated.getTime() > System.currentTimeMillis()-60*60*24*1000;
+    public boolean isUpToDate(int timeFrame){
+        return dateUpdated.getTime() > System.currentTimeMillis()-timeFrame;
     }
 
     public void saveModel(Context context, String fileName) throws IOException{

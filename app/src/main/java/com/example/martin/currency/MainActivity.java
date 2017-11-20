@@ -1,8 +1,9 @@
 package com.example.martin.currency;
 
 import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.AsyncTask;
-import android.os.PersistableBundle;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.Editable;
@@ -11,7 +12,6 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
@@ -20,19 +20,11 @@ import android.widget.Toast;
 import com.example.martin.currency.model.ConverterModel;
 import com.example.martin.currency.model.Currency;
 import com.example.martin.currency.model.CurrencyXmlParser;
-import com.example.martin.currency.model.GuessModel;
 
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.ObjectStreamException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.sql.Time;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -43,31 +35,31 @@ public class MainActivity extends AppCompatActivity {
     private Spinner toSpinner;
     private EditText inputView;
     private TextView convertedView;
+    private String URL;
 
-
-    // Given a string representation of a URL, sets up a connection and gets
-// an input stream.
+    /**
+     *     Given a string representation of a URL,
+     *     sets up a connection and gets an input stream.
+     */
     private InputStream downloadUrl(String urlString) throws IOException {
         java.net.URL url = new URL(urlString);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setReadTimeout(10000 /* milliseconds */);
-        conn.setConnectTimeout(15000 /* milliseconds */);
-        conn.setRequestMethod("GET");
-        conn.setDoInput(true);
         // Starts the query
         conn.connect();
         return conn.getInputStream();
     }
 
-    class RetrieveFeedTask extends AsyncTask<String, Void, String> {
+    public class RetrieveFeedTask extends AsyncTask<String, Void, String> {
         @Override
         protected String doInBackground(String... strings) {
             try {
                 InputStream stream = downloadUrl(strings[0]);
                 CurrencyXmlParser  parser = new CurrencyXmlParser();
                 ArrayList<Currency> currencies = new ArrayList<>();
-                currencies.addAll((ArrayList<Currency>) parser.parse(stream));
+                currencies.addAll((ArrayList<Currency>) parser.parse(stream, this ));
                 //Since Eur doesnt exist in XML add it
+                if(isCancelled())
+                    return "Cancelled";
                 currencies.add(0,new Currency("EUR",1));
                 ConverterModel.getInstance().setCurrencies(currencies);
                 return "Success";
@@ -84,10 +76,17 @@ public class MainActivity extends AppCompatActivity {
                 showToast("Failed to download values");
                 return;
             }
-            showToast("Downloaded values from XML");
-            ConverterModel.getInstance().setDateUpdated(new Date());
-            saveModel();
-            loadCurrenciesToSpinners();
+            else if(result.equals("Success")) {
+                showToast("Downloaded values from XML");
+                ConverterModel.getInstance().setDateUpdated(new Date());
+                saveModel();
+                loadCurrenciesToSpinners();
+             }
+            else if(result.equals("Cancelled")){
+                showToast("Download cancelled");
+                return;
+            }
+
         }
     }
 
@@ -110,7 +109,6 @@ public class MainActivity extends AppCompatActivity {
         ArrayList<SpinnerItem> listOfCurrencies = new ArrayList<>();
         for (String c: currencies) {
             int resID = getResources().getIdentifier(c.substring(0,2).toLowerCase(), "drawable", getString(R.string.projectName));
-            Log.d("test", c.substring(0,2).toLowerCase());
             listOfCurrencies.add(new SpinnerItem(c, resID));
         }
         SpinnerAdapter adapter = new SpinnerAdapter(getApplicationContext(), listOfCurrencies);
@@ -118,8 +116,11 @@ public class MainActivity extends AppCompatActivity {
         toSpinner.setAdapter(adapter);
     }
 
+    private RetrieveFeedTask getDataTask = new RetrieveFeedTask() ;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        URL = getString(R.string.URL);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         fromSpinner = findViewById(R.id.from_spinner);
@@ -130,38 +131,43 @@ public class MainActivity extends AppCompatActivity {
         fromSpinner.setOnItemSelectedListener( new SpinnerHandler());
         toSpinner.setOnItemSelectedListener( new SpinnerHandler());
 
+
+        ConnectivityManager connManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        NetworkInfo wifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+
         //If no previous instance existed run as first time opened
         if(savedInstanceState == null) {
             try{
                 ConverterModel.getInstance().loadModel(this, getString(R.string.localFileName));
-                if(ConverterModel.getInstance().isUpToDate()) {
-                    showToast("Loaded from local files");
-                    loadCurrenciesToSpinners();
+                if(connManager.getActiveNetworkInfo() == null) {
+                    showToast("No internet connection using outdated data");
                 }
                 else {
-                    new RetrieveFeedTask().execute(getString(R.string.URL));
+                    if (wifi.isConnected()) {
+                        if (!ConverterModel.getInstance().isUpToDate(60 * 10 * 1000)) {
+                            getDataTask.execute(URL);
+                        }
+                    }
+                    else {
+                        if (!ConverterModel.getInstance().isUpToDate(60* 60 * 1000)) {
+                            getDataTask.execute(URL);
+                        }
+                    }
                 }
             }
             catch (Exception e){
                 showToast("Couldn't load values from file");
-                new RetrieveFeedTask().execute(getString(R.string.URL));
+                getDataTask.execute(URL);
             }
-
-            /*
-            if(loadSavedValues()){
-                //If more than a day has passed
-                if(ConverterModel.getInstance().getDateUpdated().getTime() < System.currentTimeMillis()-60*60*24*1000)
-                    new RetrieveFeedTask().execute(URL);
-                else {
-                    loadCurrencies();
-                    showToast("Loaded from local files");
-                }
-            }
-            else {
-                new RetrieveFeedTask().execute(URL);
-            }
-*/
+            loadCurrenciesToSpinners();
         }
+    }
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        getDataTask.cancel(true);
     }
 
     /**
@@ -178,7 +184,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * When app is resumed restore previous saved view state
+     * When app is resumed restore previous saved instance state
      */
     @Override
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
@@ -208,7 +214,15 @@ public class MainActivity extends AppCompatActivity {
     private void updateConversion(){
         String input = inputView.getText().toString();
         if(!input.isEmpty()) {
-            Double amount = Double.parseDouble(input);
+            Double amount;
+            try {
+                amount = Double.parseDouble(input);
+            }
+            catch (Exception e){
+                showToast("Only numbers allowed!");
+                inputView.setText("");
+                return;
+            }
             DecimalFormat numberFormat = new DecimalFormat("#.00");
             try {
                 if(toSpinner.getSelectedItem() == null)

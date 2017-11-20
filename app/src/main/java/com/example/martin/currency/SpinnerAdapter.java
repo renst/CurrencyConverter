@@ -20,10 +20,10 @@ import java.util.List;
  */
 
 public class SpinnerAdapter extends BaseAdapter implements Serializable{
-    int id;
-    Context context;
-    ArrayList<SpinnerItem> list;
-    LayoutInflater inflater;
+    private int id;
+    private transient Context context;
+    private ArrayList<SpinnerItem> list;
+    private transient LayoutInflater inflater;
 
     public SpinnerAdapter( Context context,  ArrayList<SpinnerItem> list) {
         this.context = context;
@@ -53,8 +53,8 @@ public class SpinnerAdapter extends BaseAdapter implements Serializable{
      */
     public View getView(int pos, View convertView, ViewGroup viewGroup){
         View view = inflater.inflate(R.layout.custom_spinner, null);
-        ImageView icon = (ImageView) view.findViewById(R.id.img);
-        TextView textView = (TextView) view.findViewById(R.id.txt);
+        ImageView icon = view.findViewById(R.id.img);
+        TextView textView = view.findViewById(R.id.txt);
 
         icon.setImageResource(list.get(pos).getImageId());
         textView.setText(list.get(pos).getText());

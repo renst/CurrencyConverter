@@ -3,6 +3,8 @@ package com.example.martin.currency.model;
 import android.util.Log;
 import android.util.Xml;
 
+import com.example.martin.currency.MainActivity;
+
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -19,19 +21,19 @@ public class CurrencyXmlParser {
 
     private static final String ns = null;
 
-    public List parse(InputStream in) throws XmlPullParserException, IOException {
+    public List parse(InputStream in, MainActivity.RetrieveFeedTask task) throws XmlPullParserException, IOException {
         try {
             XmlPullParser parser = Xml.newPullParser();
             parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false);
             parser.setInput(in, null);
             parser.nextTag();
-            return readFeed(parser);
+            return readFeed(parser,task);
         } finally {
             in.close();
         }
     }
 
-    private List readFeed(XmlPullParser parser) throws XmlPullParserException, IOException {
+    private List readFeed(XmlPullParser parser, MainActivity.RetrieveFeedTask task) throws XmlPullParserException, IOException {
         List entries = new ArrayList();
         String currency = null;
         double rate = 0;
@@ -39,6 +41,8 @@ public class CurrencyXmlParser {
         parser.require(XmlPullParser.START_TAG, ns, "gesmes:Envelope");
 
         while (parser.next() != XmlPullParser.END_TAG) {
+            if(task.isCancelled())
+                break;
             if (parser.getEventType() != XmlPullParser.START_TAG) {
                 continue;
             }
