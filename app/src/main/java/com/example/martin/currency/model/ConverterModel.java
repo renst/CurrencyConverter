@@ -93,7 +93,7 @@ public class ConverterModel implements Serializable {
         this.dateUpdated = dateUpdated;
     }
 
-    public boolean isUpToDate(int timeFrame){
+    public boolean isUpToDate(Double timeFrame){
         return dateUpdated.getTime() > System.currentTimeMillis()-timeFrame;
     }
 

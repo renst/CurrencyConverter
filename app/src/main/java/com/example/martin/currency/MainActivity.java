@@ -1,9 +1,12 @@
 package com.example.martin.currency;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.AsyncTask;
+import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.Editable;
@@ -21,6 +24,8 @@ import com.example.martin.currency.model.ConverterModel;
 import com.example.martin.currency.model.Currency;
 import com.example.martin.currency.model.CurrencyXmlParser;
 
+import org.xmlpull.v1.XmlPullParserException;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -35,61 +40,75 @@ public class MainActivity extends AppCompatActivity {
     private Spinner toSpinner;
     private EditText inputView;
     private TextView convertedView;
-    private String URL;
 
-    /**
-     *     Given a string representation of a URL,
-     *     sets up a connection and gets an input stream.
-     */
-    private InputStream downloadUrl(String urlString) throws IOException {
-        java.net.URL url = new URL(urlString);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        // Starts the query
-        conn.connect();
-        return conn.getInputStream();
+    public void btnSettings_onClick(View view) {
+        Intent intent = new Intent(this, SettingsActivity.class);
+        startActivity(intent);
     }
 
-    public class RetrieveFeedTask extends AsyncTask<String, Void, String> {
+
+    public class UpdateCurrenciesTask extends AsyncTask<String, Void, String> {
+        /**
+         * Given a string representation of a URL,
+         * sets up a connection and parse data
+         * @param URL
+         * @return  list of currencies parsed
+         * @throws IOException
+         */
+        private ArrayList<Currency> updateCurrencies(String URL) throws IOException {
+            URL url = new URL(URL);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            InputStream stream = conn.getInputStream();
+            CurrencyXmlParser  parser = new CurrencyXmlParser();
+            ArrayList<Currency> currencies = new ArrayList<>();
+            //Since EUR doesnt exist in XML add it
+            currencies.add(0,new Currency("EUR",1));
+            try {
+                currencies.addAll((ArrayList<Currency>) parser.parse(stream, this ));
+            } catch (XmlPullParserException e) {
+                e.printStackTrace();
+            }
+            return currencies;
+        }
+
         @Override
         protected String doInBackground(String... strings) {
             try {
-                InputStream stream = downloadUrl(strings[0]);
-                CurrencyXmlParser  parser = new CurrencyXmlParser();
-                ArrayList<Currency> currencies = new ArrayList<>();
-                currencies.addAll((ArrayList<Currency>) parser.parse(stream, this ));
-                //Since Eur doesnt exist in XML add it
+                ConverterModel.getInstance().setCurrencies(updateCurrencies(getString(R.string.URL)));
+                Log.d("test", ConverterModel.getInstance().getCurrenciesNames().toString());
+
                 if(isCancelled())
                     return "Cancelled";
-                currencies.add(0,new Currency("EUR",1));
-                ConverterModel.getInstance().setCurrencies(currencies);
+
                 return "Success";
             }catch (Exception e) {
-                //Get old values here
-                Log.d("Test","Error ", e);
                 return "Failed";
             }
         }
 
         @Override
         protected void onPostExecute(String result) {
-            if(result.equals("Failed")){
-                showToast("Failed to download values");
-                return;
-            }
-            else if(result.equals("Success")) {
-                showToast("Downloaded values from XML");
-                ConverterModel.getInstance().setDateUpdated(new Date());
-                saveModel();
-                loadCurrenciesToSpinners();
-             }
-            else if(result.equals("Cancelled")){
-                showToast("Download cancelled");
-                return;
+            switch (result) {
+                case "Failed":
+                    showToast("Failed to download values");
+                    return;
+                case "Success":
+                    showToast("Downloaded values from XML");
+                    ConverterModel.getInstance().setDateUpdated(new Date());
+                    saveModel();
+                    loadCurrenciesToSpinners();
+                    break;
+                case "Cancelled":
+                    showToast("Download cancelled");
+                    return;
             }
 
         }
     }
 
+    /**
+     * Save the current instance of ConverterModel to file
+     */
     private void saveModel(){
         try {
             ConverterModel.getInstance().saveModel(this, getString(R.string.localFileName));
@@ -116,11 +135,10 @@ public class MainActivity extends AppCompatActivity {
         toSpinner.setAdapter(adapter);
     }
 
-    private RetrieveFeedTask getDataTask = new RetrieveFeedTask() ;
+    private UpdateCurrenciesTask getDataTask = new UpdateCurrenciesTask() ;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        URL = getString(R.string.URL);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         fromSpinner = findViewById(R.id.from_spinner);
@@ -130,7 +148,8 @@ public class MainActivity extends AppCompatActivity {
         inputView.addTextChangedListener(new SubmitHandler());
         fromSpinner.setOnItemSelectedListener( new SpinnerHandler());
         toSpinner.setOnItemSelectedListener( new SpinnerHandler());
-
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        Double syncTimeMin = Double.parseDouble(sharedPreferences.getString("sync_frequency", "xxx"));
 
         ConnectivityManager connManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         NetworkInfo wifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
@@ -141,25 +160,36 @@ public class MainActivity extends AppCompatActivity {
                 ConverterModel.getInstance().loadModel(this, getString(R.string.localFileName));
                 if(connManager.getActiveNetworkInfo() == null) {
                     showToast("No internet connection using outdated data");
+                    loadCurrenciesToSpinners();
                 }
                 else {
                     if (wifi.isConnected()) {
-                        if (!ConverterModel.getInstance().isUpToDate(60 * 10 * 1000)) {
-                            getDataTask.execute(URL);
+                        if (!ConverterModel.getInstance().isUpToDate(60 * 10d * 1000)) {
+                            getDataTask.execute();
+                        }
+                        else {
+                            showToast("Loaded values from file");
+                            loadCurrenciesToSpinners();
                         }
                     }
                     else {
-                        if (!ConverterModel.getInstance().isUpToDate(60* 60 * 1000)) {
-                            getDataTask.execute(URL);
+                        if (!ConverterModel.getInstance().isUpToDate(60 * syncTimeMin * 1000)) {
+                            getDataTask.execute();
+                        }
+                        else {
+                            showToast("Loaded values from file");
+                            loadCurrenciesToSpinners();
                         }
                     }
                 }
             }
             catch (Exception e){
-                showToast("Couldn't load values from file");
-                getDataTask.execute(URL);
+                if(connManager.getActiveNetworkInfo() == null)
+                    showToast("No internet and no backup!");
+                else
+                    getDataTask.execute();
             }
-            loadCurrenciesToSpinners();
+
         }
     }
 

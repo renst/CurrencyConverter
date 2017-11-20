@@ -11,7 +11,7 @@ public class Currency implements Serializable{
     private String currency;
     private double value;
 
-
+    public Currency() {}
     public Currency(String currency, double value) {
         this.currency = currency;
         this.value = value;

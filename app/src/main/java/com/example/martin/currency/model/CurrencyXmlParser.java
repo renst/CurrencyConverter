@@ -15,68 +15,88 @@ import java.util.List;
 
 /**
  * Created by Martin on 2017-11-04.
+ * Taken from example in lecture notes
  */
 
 public class CurrencyXmlParser {
 
-    private static final String ns = null;
 
-    public List parse(InputStream in, MainActivity.RetrieveFeedTask task) throws XmlPullParserException, IOException {
+    /**
+     * Parse through xml document and retrieve currency values
+     * @param in
+     * @param task
+     * @return Currencies
+     * @throws XmlPullParserException
+     * @throws IOException
+     */
+    public List parse(InputStream in, MainActivity.UpdateCurrenciesTask task) throws XmlPullParserException, IOException {
+
+        ArrayList<Currency> currencies = new ArrayList<>();
         try {
             XmlPullParser parser = Xml.newPullParser();
-            parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false);
             parser.setInput(in, null);
-            parser.nextTag();
-            return readFeed(parser,task);
+
+            int parseEvent = parser.getEventType();
+            while (parseEvent != XmlPullParser.END_DOCUMENT) {
+                if(task.isCancelled())
+                    return currencies;
+                switch (parseEvent){
+                    case XmlPullParser.START_DOCUMENT:
+                        break;
+
+                    case XmlPullParser.START_TAG:
+                        Log.d("test", "start");
+
+                        String tagName = parser.getName();
+                        if(tagName.equalsIgnoreCase("Cube")){
+                            Currency currency = parseItem(parser);
+                            if(currency.getCurrency() != null)
+                                currencies.add(currency);
+
+                        }
+                        break;
+                    case XmlPullParser.END_DOCUMENT:
+                        return currencies;
+                }
+                parseEvent = parser.next();
+            }
         } finally {
             in.close();
         }
+        return currencies;
     }
 
-    private List readFeed(XmlPullParser parser, MainActivity.RetrieveFeedTask task) throws XmlPullParserException, IOException {
-        List entries = new ArrayList();
-        String currency = null;
-        double rate = 0;
-
-        parser.require(XmlPullParser.START_TAG, ns, "gesmes:Envelope");
-
-        while (parser.next() != XmlPullParser.END_TAG) {
-            if(task.isCancelled())
+    /**
+     * Parse an items attributes and create a new currency object
+     * @param parser
+     * @return Currency object
+     * @throws IOException
+     * @throws XmlPullParserException
+     */
+    private Currency parseItem(XmlPullParser parser) throws IOException, XmlPullParserException{
+        int parseEvent;
+        String name, item=" ";
+        Currency currency = new Currency();
+        do{
+            parseEvent = parser.next();
+            name = parser.getName();
+            if(name== null)
                 break;
-            if (parser.getEventType() != XmlPullParser.START_TAG) {
-                continue;
-            }
-            String name = parser.getName();
-            // Starts by looking for the entry tag
-            if (name.equals("Cube")) {
-                if (name.equals("Cube") && parser.getAttributeCount() == 2) {
-                    currency = parser.getAttributeValue(null, "currency");
-                    rate = Double.parseDouble(parser.getAttributeValue(null, "rate"));
-                    entries.add(new Currency(currency, rate));
-                    skip(parser);
+            if(name.equalsIgnoreCase("Cube")&& parser.getAttributeCount()==2){
+               name=parser.getAttributeName(0);
+                if(name.equalsIgnoreCase("currency")) {
+                    currency.setCurrency(parser.getAttributeValue(null,"currency"));
                 }
-            }else{
-                skip(parser);
+                name=parser.getAttributeName(1);
+                if (name.equalsIgnoreCase("rate")){
+                    currency.setRate(Double.parseDouble(parser.getAttributeValue(null, "rate")));
+                }
             }
-        }
-        return entries;
+        }while (parseEvent != XmlPullParser.END_TAG || !name.equalsIgnoreCase("Cube"));
+        return currency;
     }
 
-    //Google example parser
-    private void skip(XmlPullParser parser) throws XmlPullParserException, IOException {
-        if (parser.getEventType() != XmlPullParser.START_TAG) {
-            throw new IllegalStateException();
-        }
-        int depth = 1;
-        while (depth != 0) {
-            switch (parser.next()) {
-                case XmlPullParser.END_TAG:
-                    depth--;
-                    break;
-                case XmlPullParser.START_TAG:
-                    depth++;
-                    break;
-            }
-        }
-    }
+
 }
+
+

@@ -2,8 +2,45 @@
     <string name="app_name">Currency</string>
     <string name="projectName">com.example.martin.currency</string>
     <string name="URL">http://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml</string>
-    <string name="localFileName">savedConversionRate.ser</string>
+    <string name="localFileName">savedConversionRate2.ser</string>
+    <string name="title_activity_settings">Settings</string>
 
+
+    <!-- Example settings for Data & Sync -->
+    <string name="pref_header_data_sync">Data &amp; sync</string>
+
+    <string name="pref_title_sync_frequency">Sync frequency</string>
+    <string-array name="pref_sync_frequency_titles">
+        <item>10 seconds</item>
+        <item>30 seconds</item>
+        <item>15 minutes</item>
+        <item>30 minutes</item>
+        <item>1 hour</item>
+        <item>3 hours</item>
+    </string-array>
+    <string-array name="pref_sync_frequency_values">
+        <item>0.155</item>
+        <item>0.5</item>
+        <item>15</item>
+        <item>30</item>
+        <item>60</item>
+        <item>180</item>
+    </string-array>
+
+
+    <string-array name="multi_select_list_preference_default_value" />
+
+    <string name="pref_title_system_sync_settings">System sync settings</string>
+
+    <!-- Example settings for Notifications -->
+    <string name="pref_header_notifications">Notifications</string>
+
+    <string name="pref_title_new_message_notifications">New message notifications</string>
+
+    <string name="pref_title_ringtone">Ringtone</string>
+    <string name="pref_ringtone_silent">Silent</string>
+
+    <string name="pref_title_vibrate">Vibrate</string>
 
 
 </resources>
