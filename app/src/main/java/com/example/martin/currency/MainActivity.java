@@ -43,7 +43,6 @@ public class MainActivity extends AppCompatActivity {
     private Spinner toSpinner;
     private EditText inputView;
     private TextView convertedView;
-    private static final String URL = "http://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
 
 
     // Given a string representation of a URL, sets up a connection and gets
@@ -94,7 +93,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void saveModel(){
         try {
-            ConverterModel.getInstance().saveModel(this);
+            ConverterModel.getInstance().saveModel(this, getString(R.string.localFileName));
         }
         catch (IOException e){
             showToast("Couldn't save data to file!");
@@ -110,7 +109,7 @@ public class MainActivity extends AppCompatActivity {
         ArrayList<String> currencies = ConverterModel.getInstance().getCurrenciesNames();
         ArrayList<SpinnerItem> listOfCurrencies = new ArrayList<>();
         for (String c: currencies) {
-            int resID = getResources().getIdentifier(c.substring(0,2).toLowerCase(), "drawable", "com.example.martin.currency");
+            int resID = getResources().getIdentifier(c.substring(0,2).toLowerCase(), "drawable", getString(R.string.projectName));
             Log.d("test", c.substring(0,2).toLowerCase());
             listOfCurrencies.add(new SpinnerItem(c, resID));
         }
@@ -123,33 +122,29 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-
         fromSpinner = findViewById(R.id.from_spinner);
         toSpinner = findViewById(R.id.to_spinner);
         inputView = findViewById(R.id.input_guess);
         convertedView = findViewById(R.id.converted_result);
         inputView.addTextChangedListener(new SubmitHandler());
-
         fromSpinner.setOnItemSelectedListener( new SpinnerHandler());
         toSpinner.setOnItemSelectedListener( new SpinnerHandler());
-
 
         //If no previous instance existed run as first time opened
         if(savedInstanceState == null) {
             try{
-                ConverterModel.getInstance().loadModel(this, "test8.ser");
+                ConverterModel.getInstance().loadModel(this, getString(R.string.localFileName));
                 if(ConverterModel.getInstance().isUpToDate()) {
                     showToast("Loaded from local files");
                     loadCurrenciesToSpinners();
                 }
                 else {
-                    new RetrieveFeedTask().execute(URL);
+                    new RetrieveFeedTask().execute(getString(R.string.URL));
                 }
             }
             catch (Exception e){
                 showToast("Couldn't load values from file");
-                new RetrieveFeedTask().execute(URL);
+                new RetrieveFeedTask().execute(getString(R.string.URL));
             }
 
             /*

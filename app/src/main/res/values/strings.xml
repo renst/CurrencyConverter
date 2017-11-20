@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Currency</string>
+    <string name="projectName">com.example.martin.currency</string>
+    <string name="URL">http://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml</string>
+    <string name="localFileName">savedConversionRate.ser</string>
+
+
+
 </resources>

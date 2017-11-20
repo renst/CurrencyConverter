@@ -97,8 +97,8 @@ public class ConverterModel implements Serializable {
         return dateUpdated.getTime() > System.currentTimeMillis()-60*60*24*1000;
     }
 
-    public void saveModel(Context context) throws IOException{
-        ObjectOutputStream out = new ObjectOutputStream(context.openFileOutput("test8.ser", Context.MODE_PRIVATE));
+    public void saveModel(Context context, String fileName) throws IOException{
+        ObjectOutputStream out = new ObjectOutputStream(context.openFileOutput(fileName, Context.MODE_PRIVATE));
         out.writeObject(ConverterModel.getInstance());
         out.close();
     }
