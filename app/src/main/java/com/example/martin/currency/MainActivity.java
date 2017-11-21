@@ -48,6 +48,12 @@ public class MainActivity extends AppCompatActivity {
 
 
     public class UpdateCurrenciesTask extends AsyncTask<String, Void, String> {
+
+        private Context context;
+
+        public UpdateCurrenciesTask (Context context){
+            this.context = context;
+        }
         /**
          * Given a string representation of a URL,
          * sets up a connection and parse data
@@ -95,7 +101,11 @@ public class MainActivity extends AppCompatActivity {
                 case "Success":
                     showToast("Downloaded values from XML");
                     ConverterModel.getInstance().setDateUpdated(new Date());
-                    saveModel();
+                    try {
+                        ConverterModel.getInstance().saveModel(context, getString(R.string.localFileName));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                     loadCurrenciesToSpinners();
                     break;
                 case "Cancelled":
@@ -103,18 +113,6 @@ public class MainActivity extends AppCompatActivity {
                     return;
             }
 
-        }
-    }
-
-    /**
-     * Save the current instance of ConverterModel to file
-     */
-    private void saveModel(){
-        try {
-            ConverterModel.getInstance().saveModel(this, getString(R.string.localFileName));
-        }
-        catch (IOException e){
-            showToast("Couldn't save data to file!");
         }
     }
 
@@ -135,7 +133,7 @@ public class MainActivity extends AppCompatActivity {
         toSpinner.setAdapter(adapter);
     }
 
-    private UpdateCurrenciesTask getDataTask = new UpdateCurrenciesTask() ;
+    private UpdateCurrenciesTask getDataTask = new UpdateCurrenciesTask(this) ;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -148,52 +146,54 @@ public class MainActivity extends AppCompatActivity {
         inputView.addTextChangedListener(new SubmitHandler());
         fromSpinner.setOnItemSelectedListener( new SpinnerHandler());
         toSpinner.setOnItemSelectedListener( new SpinnerHandler());
-        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        Double syncTimeMin = Double.parseDouble(sharedPreferences.getString("sync_frequency", "xxx"));
-
-        ConnectivityManager connManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-        NetworkInfo wifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
 
         //If no previous instance existed run as first time opened
         if(savedInstanceState == null) {
-            try{
-                ConverterModel.getInstance().loadModel(this, getString(R.string.localFileName));
-                if(connManager.getActiveNetworkInfo() == null) {
-                    showToast("No internet connection using outdated data");
-                    loadCurrenciesToSpinners();
-                }
-                else {
-                    if (wifi.isConnected()) {
-                        if (!ConverterModel.getInstance().isUpToDate(60 * 10d * 1000)) {
-                            getDataTask.execute();
-                        }
-                        else {
-                            showToast("Loaded values from file");
-                            loadCurrenciesToSpinners();
-                        }
-                    }
-                    else {
-                        if (!ConverterModel.getInstance().isUpToDate(60 * syncTimeMin * 1000)) {
-                            getDataTask.execute();
-                        }
-                        else {
-                            showToast("Loaded values from file");
-                            loadCurrenciesToSpinners();
-                        }
-                    }
-                }
-            }
-            catch (Exception e){
-                if(connManager.getActiveNetworkInfo() == null)
-                    showToast("No internet and no backup!");
-                else
-                    getDataTask.execute();
-            }
-
+            initializeConverter();
         }
     }
 
 
+    /**
+     * Load in currencies either from local file or XML
+     * depending on internet connection and access to local file
+     */
+    private void initializeConverter(){
+        SharedPreferences sharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
+        Double syncTime = Double.parseDouble(sharedPreferences.getString("sync_frequency", "xxx"));
+        ConnectivityManager connManager = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        NetworkInfo wifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+
+        try{
+            ConverterModel.getInstance().loadModel(this, getString(R.string.localFileName));
+            if(connManager.getActiveNetworkInfo() == null) {
+                showToast("No internet connection using outdated data");
+                loadCurrenciesToSpinners();
+                return;
+            }
+            if (wifi.isConnected())
+                syncTime = syncTime* 10*1000;
+            else
+                syncTime = syncTime*60*1000;
+
+            if (!ConverterModel.getInstance().isUpToDate(syncTime)) {
+                getDataTask.execute();
+                return;
+            }
+            showToast("Loaded values from file");
+            loadCurrenciesToSpinners();
+        }
+        catch (Exception e){
+            if(connManager.getActiveNetworkInfo() == null)
+                showToast("No internet and no backup!");
+            else
+                getDataTask.execute();
+        }
+    }
+
+    /**
+     * When user leaves activity set cancel flag in background task to true
+     */
     @Override
     protected void onPause() {
         super.onPause();
@@ -226,7 +226,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private  class SpinnerHandler implements Spinner.OnItemSelectedListener{
-
         @Override
         public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
             updateConversion();
@@ -234,7 +233,6 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onNothingSelected(AdapterView<?> adapterView) {
-
         }
     }
 
@@ -286,8 +284,6 @@ public class MainActivity extends AppCompatActivity {
             updateConversion();
         }
     }
-
-
 
     private void showToast(String msg){
         Toast toast = Toast.makeText(this, msg, Toast.LENGTH_LONG);
